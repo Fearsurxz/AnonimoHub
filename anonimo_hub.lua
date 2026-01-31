@@ -1,41 +1,64 @@
---// 🔴 ANÓNIMO HUB | FLY + NOCLIP (SIN FLOTAR)
+-- 🔴 ANÓNIMO HUB | FLY + NOCLIP (RESPAWN FIX)
+-- Funciona incluso al morir o reiniciar
+
+if not game:IsLoaded() then
+	game.Loaded:Wait()
+end
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local char, hrp, humanoid
+local att, lv, ao
 
 local flying = false
 local noclip = false
 local speed = 80
 local verticalSpeed = 50
 
--- ===== CARGAR PERSONAJE =====
-local function loadChar()
-	char = player.Character or player.CharacterAdded:Wait()
+-- ===== SETUP PERSONAJE (RESPAWN SAFE) =====
+local function setupCharacter(character)
+	char = character
 	humanoid = char:WaitForChild("Humanoid")
 	hrp = char:WaitForChild("HumanoidRootPart")
+
+	-- Limpiar restos viejos
+	if att then att:Destroy() end
+	if lv then lv:Destroy() end
+	if ao then ao:Destroy() end
+
+	-- Attachment
+	att = Instance.new("Attachment")
+	att.Parent = hrp
+
+	-- LinearVelocity
+	lv = Instance.new("LinearVelocity")
+	lv.Attachment0 = att
+	lv.MaxForce = math.huge
+	lv.RelativeTo = Enum.ActuatorRelativeTo.World
+	lv.Enabled = flying
+	lv.Parent = hrp
+
+	-- AlignOrientation
+	ao = Instance.new("AlignOrientation")
+	ao.Attachment0 = att
+	ao.MaxTorque = math.huge
+	ao.Responsiveness = 200
+	ao.Enabled = flying
+	ao.Parent = hrp
 end
-loadChar()
-player.CharacterAdded:Connect(loadChar)
 
--- ===== ATTACHMENT =====
-local att = Instance.new("Attachment", hrp)
+-- Primera carga
+if player.Character then
+	setupCharacter(player.Character)
+end
 
-local lv = Instance.new("LinearVelocity")
-lv.Attachment0 = att
-lv.MaxForce = math.huge
-lv.RelativeTo = Enum.ActuatorRelativeTo.World
-lv.Enabled = false
-lv.Parent = hrp
-
-local ao = Instance.new("AlignOrientation")
-ao.Attachment0 = att
-ao.MaxTorque = math.huge
-ao.Responsiveness = 200
-ao.Enabled = false
-ao.Parent = hrp
+-- Respawn
+player.CharacterAdded:Connect(function(character)
+	task.wait(0.5)
+	setupCharacter(character)
+end)
 
 -- ===== NOCLIP =====
 RunService.Stepped:Connect(function()
@@ -48,13 +71,11 @@ RunService.Stepped:Connect(function()
 	end
 end)
 
--- ===== FLY (SIN FLOTAR) =====
+-- ===== FLY =====
 RunService.RenderStepped:Connect(function()
-	if flying then
+	if flying and humanoid and lv and ao then
 		local moveDir = humanoid.MoveDirection
 		local cam = workspace.CurrentCamera
-
-		-- 🔥 SOLO SUBE/BAJA SI USAS EL JOYSTICK
 		local vertical = cam.CFrame.LookVector.Y * verticalSpeed * moveDir.Magnitude
 
 		if moveDir.Magnitude > 0 then
@@ -71,23 +92,28 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- ===== START / STOP FLY =====
 local function startFly()
 	flying = true
-	lv.Enabled = true
-	ao.Enabled = true
+	if lv and ao then
+		lv.Enabled = true
+		ao.Enabled = true
+	end
 end
 
 local function stopFly()
 	flying = false
-	lv.Enabled = false
-	ao.Enabled = false
-	lv.VectorVelocity = Vector3.zero
+	if lv and ao then
+		lv.Enabled = false
+		ao.Enabled = false
+		lv.VectorVelocity = Vector3.zero
+	end
 end
 
 -- ===== GUI =====
-local gui = Instance.new("ScreenGui", player.PlayerGui)
+local gui = Instance.new("ScreenGui")
+gui.Name = "AnonimoHub"
 gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0,200,0,160)
